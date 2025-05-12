@@ -167,3 +167,72 @@ All configuration is driven by environment variables or Helm `--set` flags:
 | `serviceAccount.create` | Create a K8s ServiceAccount | `false`      |
 | `ingress.enabled`       | Enable ingress              | `false`      |
 | `autoscaling.enabled`   | Enable HPA                  | `false`      |
+
+## API Usage
+
+To interact with the Sticky Notes API, you first register a user, then log in to receive a JWT, and finally include that token in the `Authorization` header for all note operations.
+
+### 1. Register a new user
+
+```bash
+curl -X POST http://<host>:<port>/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"secret"}'
+```
+
+*Response example:*
+
+```json
+{
+  "id": "74c46895-e100-4206-a126-d9d56e3a2a6d",
+  "username": "alice"
+}
+```
+
+### 2. Log in to get a JWT
+
+```bash
+curl -X POST http://<host>:<port>/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"alice","password":"secret"}'
+```
+
+*Response example:*
+
+```json
+{
+  "token": "<YOUR_JWT_TOKEN_HERE>"
+}
+```
+
+### 3. Create a new note
+
+```bash
+curl -X POST http://<host>:<port>/api/notes \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <YOUR_JWT_TOKEN_HERE>" \
+  -d '{"title":"Hello","content":"World"}'
+```
+
+### 4. List all notes
+
+```bash
+curl -X GET http://<host>:<port>/api/notes \
+  -H "Authorization: Bearer <YOUR_JWT_TOKEN_HERE>"
+```
+
+### 5. Update a note
+
+```bash
+curl -X PUT http://<host>:<port>/api/notes/<NOTE_ID> \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <YOUR_JWT_TOKEN_HERE>" \
+  -d '{"title":"Updated","content":"Changed"}'
+```
+
+### 6. Delete a note
+
+```bash
+curl -X DELETE http://<host>:<port>/api/notes/<NOTE_ID> \
+  -H "Authorization: Bearer <YOUR_JWT_TOKEN_HERE>"
+```
