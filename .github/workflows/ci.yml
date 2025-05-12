@@ -9,6 +9,29 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_DB: sticky_dev
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DB_HOST: localhost
+      DB_PORT: 5432
+      DB_NAME: sticky_dev
+      DB_USER: postgres
+      DB_PASS: postgres
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -32,7 +55,6 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        id: ecr-login
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build, tag, and push Docker image
