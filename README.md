@@ -1,28 +1,29 @@
 # Sticky Notes
 
-A containerized web application for creating and managing personal sticky notes. Built with Node.js, Express, PostgreSQL (via Sequelize), Docker, Kubernetes (Helm), and CI/CD on AWS.
+A containerized web application for creating and managing personal sticky notes. Built with Node.js, Express, PostgreSQL (Sequelize), Docker, Kubernetes (Helm), and automated CI/CD on AWS.
 
 ## Features
 
-* User registration & authentication (JWT-based)
-* CRUD operations for sticky notes (each user only accesses their own notes)
-* Local development with Postgres
-* Containerized with Docker
-* Kubernetes deployment via Helm chart
-* CI/CD pipeline (GitHub Actions) that:
-
-  * Runs tests against a Postgres service
-  * Builds & pushes Docker images to AWS ECR
-  * Deploys to AWS EKS via Helm
+* User registration & JWT-based authentication
+* CRUD operations for sticky notes (user-specific)
+* Configurable rate limiting on API routes
+* Local development with Dockerized Postgres
+* Containerized application via Docker
+* Kubernetes deployment with Helm chart
+* CI/CD pipeline that tests, builds, and deploys to AWS EKS
 
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
 2. [Local Development](#local-development)
-3. [Running with Docker](#running-with-docker)
-4. [Kubernetes Deployment (Helm)](#kubernetes-deployment-helm)
-5. [CI/CD Pipeline](#cicd-pipeline)
-6. [Testing](#testing)
+
+   * [Setup](#setup)
+   * [Running the App](#running-the-app)
+   * [Testing](#testing)
+3. [API Usage](#api-usage)
+4. [Running with Docker](#running-with-docker)
+5. [Kubernetes Deployment (Helm)](#kubernetes-deployment-helm)
+6. [CI/CD Pipeline](#cicd-pipeline)
 7. [Configuration](#configuration)
 8. [License](#license)
 
@@ -30,12 +31,13 @@ A containerized web application for creating and managing personal sticky notes.
 
 * Node.js v18
 * Docker
-* PostgreSQL (for local dev) or Docker
-* kubectl, Helm (for Kubernetes)
-* AWS CLI, `eksctl` (for EKS)
-* GitHub account with repository secrets configured
+* Kubernetes CLI (`kubectl`) and Helm (for K8s deployments)
+* AWS CLI and `eksctl` (for AWS EKS)
+* Git and GitHub repository with Actions secrets configured
 
 ## Local Development
+
+### Setup
 
 1. Clone the repo:
 
@@ -43,23 +45,20 @@ A containerized web application for creating and managing personal sticky notes.
    git clone https://github.com/<YOUR_USERNAME>/sticky-notes.git
    cd sticky-notes
    ```
-
 2. Install dependencies:
 
    ```bash
    npm install
    ```
-
-3. Start a local Postgres instance (via Docker):
+3. Start a local Postgres via Docker:
 
    ```bash
    docker run --name sticky-postgres -e POSTGRES_DB=sticky_dev \
      -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres:15
    ```
+4. Create a `.env` file in project root:
 
-4. Configure environment variables (create a `.env` file):
-
-   ```env
+   ```dotenv
    DB_HOST=localhost
    DB_PORT=5432
    DB_NAME=sticky_dev
@@ -68,27 +67,86 @@ A containerized web application for creating and managing personal sticky notes.
    JWT_SECRET=your_jwt_secret
    ```
 
-5. Run the app:
+### Running the App
+
+```bash
+npm run dev
+```
+
+Visit [http://localhost:3000](http://localhost:3000).
+
+### Testing
+
+Run unit and integration tests against the local Postgres:
+
+```bash
+npm test
+```
+
+## API Usage
+
+Interact with the API using `curl` or any HTTP client:
+
+1. **Register** a user:
 
    ```bash
-   npm run dev
+   curl -X POST http://localhost:3000/api/auth/register \
+     -H "Content-Type: application/json" \
+     -d '{"username":"alice","password":"secret"}'
+   ```
+2. **Login** to obtain a JWT:
+
+   ```bash
+   curl -X POST http://localhost:3000/api/auth/login \
+     -H "Content-Type: application/json" \
+     -d '{"username":"alice","password":"secret"}'
    ```
 
-   Visit [http://localhost:3000](http://localhost:3000)
+   Response:
+
+   ```json
+   { "token": "<YOUR_JWT_TOKEN>" }
+   ```
+3. **Create** a note:
+
+   ```bash
+   curl -X POST http://localhost:3000/api/notes \
+     -H "Authorization: Bearer <YOUR_JWT_TOKEN>" \
+     -H "Content-Type: application/json" \
+     -d '{"title":"Hello","content":"World"}'
+   ```
+4. **List** notes:
+
+   ```bash
+   curl -X GET http://localhost:3000/api/notes \
+     -H "Authorization: Bearer <YOUR_JWT_TOKEN>"
+   ```
+5. **Update** a note:
+
+   ```bash
+   curl -X PUT http://localhost:3000/api/notes/<NOTE_ID> \
+     -H "Authorization: Bearer <YOUR_JWT_TOKEN>" \
+     -H "Content-Type: application/json" \
+     -d '{"title":"Updated","content":"Changed"}'
+   ```
+6. **Delete** a note:
+
+   ```bash
+   curl -X DELETE http://localhost:3000/api/notes/<NOTE_ID> \
+     -H "Authorization: Bearer <YOUR_JWT_TOKEN>"
+   ```
 
 ## Running with Docker
 
-1. Build the image:
+1. Build the Docker image:
 
    ```bash
    docker build -t sticky-notes:latest .
    ```
-
-2. Run a container:
+2. Run the container (link to local Postgres):
 
    ```bash
-   docker run -d \
-     --name sticky-notes \
+   docker run -d --name sticky-notes \
      --link sticky-postgres:postgres \
      -e DB_HOST=postgres -e DB_PORT=5432 \
      -e DB_NAME=sticky_dev -e DB_USER=postgres \
@@ -98,13 +156,13 @@ A containerized web application for creating and managing personal sticky notes.
 
 ## Kubernetes Deployment (Helm)
 
-1. Ensure your cluster is running and `kubectl` is configured.
-2. Deploy Postgres in-cluster:
+1. Ensure your cluster is up and `kubectl` is configured.
+2. Deploy Postgres:
 
    ```bash
    kubectl apply -f postgres.yaml
    ```
-3. Deploy the app chart:
+3. Deploy the chart:
 
    ```bash
    helm upgrade --install sticky-notes ./sticky-notes-chart \
@@ -118,7 +176,7 @@ A containerized web application for creating and managing personal sticky notes.
      --set image.repository=<ECR_REGISTRY>/<ECR_REPO> \
      --set image.tag=<IMAGE_TAG>
    ```
-4. Port-forward to test locally:
+4. Port-forward:
 
    ```bash
    kubectl port-forward svc/sticky-notes-sticky-notes-chart 3000:3000
@@ -128,11 +186,11 @@ A containerized web application for creating and managing personal sticky notes.
 
 The GitHub Actions workflow (`.github/workflows/ci.yml`) performs:
 
-1. **Tests**: Spins up a Postgres service and runs Jest.
-2. **Build & Push**: Builds Docker image, ensures ECR repo exists, logs in, and pushes.
-3. **Deploy**: Updates EKS kubeconfig and deploys via Helm.
+1. **Tests**: Spins up Postgres service & runs Jest.
+2. **Build & Push**: Builds Docker image, ensures ECR repo exists, pushes to ECR.
+3. **Deploy**: Updates kubeconfig and deploys via Helm.
 
-Add these Actions secrets in your GitHub repo:
+Add these secrets in GitHub repo settings:
 
 * `AWS_ACCESS_KEY_ID`
 * `AWS_SECRET_ACCESS_KEY`
@@ -142,17 +200,9 @@ Add these Actions secrets in your GitHub repo:
 * `EKS_CLUSTER_NAME`
 * `JWT_SECRET`
 
-## Testing
-
-* Run unit & integration tests:
-
-  ```bash
-  npm test
-  ```
-
 ## Configuration
 
-All configuration is driven by environment variables or Helm `--set` flags:
+Environment variables or Helm `--set` flags:
 
 | Variable/Flag           | Description                 | Default      |
 | ----------------------- | --------------------------- | ------------ |
@@ -168,71 +218,6 @@ All configuration is driven by environment variables or Helm `--set` flags:
 | `ingress.enabled`       | Enable ingress              | `false`      |
 | `autoscaling.enabled`   | Enable HPA                  | `false`      |
 
-## API Usage
+## License
 
-To interact with the Sticky Notes API, you first register a user, then log in to receive a JWT, and finally include that token in the `Authorization` header for all note operations.
-
-### 1. Register a new user
-
-```bash
-curl -X POST http://<host>:<port>/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"alice","password":"secret"}'
-```
-
-*Response example:*
-
-```json
-{
-  "id": "74c46895-e100-4206-a126-d9d56e3a2a6d",
-  "username": "alice"
-}
-```
-
-### 2. Log in to get a JWT
-
-```bash
-curl -X POST http://<host>:<port>/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"alice","password":"secret"}'
-```
-
-*Response example:*
-
-```json
-{
-  "token": "<YOUR_JWT_TOKEN_HERE>"
-}
-```
-
-### 3. Create a new note
-
-```bash
-curl -X POST http://<host>:<port>/api/notes \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <YOUR_JWT_TOKEN_HERE>" \
-  -d '{"title":"Hello","content":"World"}'
-```
-
-### 4. List all notes
-
-```bash
-curl -X GET http://<host>:<port>/api/notes \
-  -H "Authorization: Bearer <YOUR_JWT_TOKEN_HERE>"
-```
-
-### 5. Update a note
-
-```bash
-curl -X PUT http://<host>:<port>/api/notes/<NOTE_ID> \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <YOUR_JWT_TOKEN_HERE>" \
-  -d '{"title":"Updated","content":"Changed"}'
-```
-
-### 6. Delete a note
-
-```bash
-curl -X DELETE http://<host>:<port>/api/notes/<NOTE_ID> \
-  -H "Authorization: Bearer <YOUR_JWT_TOKEN_HERE>"
-```
+This project is licensed under the MIT License.
