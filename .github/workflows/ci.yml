@@ -49,6 +49,11 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Debug ECR vars
+        run: |
+          echo "ECR_REGISTRY = $ECR_REGISTRY"
+          echo "ECR_REPOSITORY = $ECR_REPOSITORY"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -56,18 +61,15 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names $ECR_REPOSITORY \
+            || aws ecr create-repository --repository-name $ECR_REPOSITORY --region $AWS_REGION
+
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Debug ECR vars
-        run: |
-          echo "ECR_REGISTRY = $ECR_REGISTRY"
-          echo "ECR_REPOSITORY = $ECR_REPOSITORY"
-
       - name: Build, tag, and push Docker image
-        env:
-          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
         run: |
           IMAGE_TAG=${{ github.sha }}
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
@@ -77,10 +79,6 @@ jobs:
         run: aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}
 
       - name: Deploy to EKS with Helm
-        env:
-          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           IMAGE_TAG=${{ github.sha }}
           helm upgrade --install sticky-notes ./sticky-notes-chart \
