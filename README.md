@@ -217,7 +217,3 @@ Environment variables or Helm `--set` flags:
 | `serviceAccount.create` | Create a K8s ServiceAccount | `false`      |
 | `ingress.enabled`       | Enable ingress              | `false`      |
 | `autoscaling.enabled`   | Enable HPA                  | `false`      |
-
-## License
-
-This project is licensed under the MIT License.
